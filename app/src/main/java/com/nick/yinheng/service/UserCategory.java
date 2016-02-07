@@ -1,5 +1,5 @@
 package com.nick.yinheng.service;
 
 public enum  UserCategory {
-    Favourite, Recent, Hated
+    Favourite, Recent, All
 }

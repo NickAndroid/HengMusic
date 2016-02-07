@@ -1,4 +1,8 @@
 <resources>
     <string name="app_name">YinHeng</string>
     <string name="action_settings">Settings</string>
+
+    <string name="category_all">All</string>
+    <string name="category_recent">Recent</string>
+    <string name="category_liked">Liked</string>
 </resources>

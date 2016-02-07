@@ -6,8 +6,6 @@ import android.os.IBinder;
 import android.os.RemoteException;
 import android.support.annotation.Nullable;
 
-import com.nick.yinheng.IMusicPlayerService;
-import com.nick.yinheng.IPlaybackListener;
 
 public class MediaPlayerService extends Service {
 
