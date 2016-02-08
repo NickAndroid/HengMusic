@@ -95,4 +95,15 @@ public class IMediaTrack implements Parcelable {
         dest.writeLong(albumId);
         dest.writeString(url);
     }
+
+    @Override
+    public String toString() {
+        return "IMediaTrack{" +
+                "title='" + title + '\'' +
+                ", artist='" + artist + '\'' +
+                ", id=" + id +
+                ", albumId=" + albumId +
+                ", url='" + url + '\'' +
+                '}';
+    }
 }

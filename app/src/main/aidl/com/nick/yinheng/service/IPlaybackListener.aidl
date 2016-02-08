@@ -4,7 +4,6 @@ package com.nick.yinheng.service;
 import com.nick.yinheng.model.IMediaTrack;
 
 interface IPlaybackListener {
-
     void onPlayerStart(in IMediaTrack track);
     void onPlayerPlaying(in IMediaTrack track);
     void onPlayerPaused(in IMediaTrack track);

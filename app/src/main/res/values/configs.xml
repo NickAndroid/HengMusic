@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <integer name="splash_delay">500</integer>
+    <integer name="splash_duration">200</integer>
+
+</resources>
