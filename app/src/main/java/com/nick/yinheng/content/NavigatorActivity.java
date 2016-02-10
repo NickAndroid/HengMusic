@@ -1,16 +1,15 @@
 package com.nick.yinheng.content;
 
+import android.os.Bundle;
 import android.os.IBinder;
 import android.os.RemoteException;
-import android.support.design.widget.TabLayout;
 import android.support.design.widget.FloatingActionButton;
-import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.Toolbar;
-
+import android.support.design.widget.TabLayout;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentPagerAdapter;
 import android.support.v4.view.ViewPager;
-import android.os.Bundle;
+import android.support.v7.app.AppCompatActivity;
+import android.support.v7.widget.Toolbar;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -28,7 +27,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-public class NavigatorActivity extends AppCompatActivity implements ScrollStateAdapter{
+public class NavigatorActivity extends AppCompatActivity implements ScrollStateAdapter {
 
     private FloatingActionButton mFab;
     private AtomicBoolean mIsPlaying = new AtomicBoolean(false);
@@ -140,6 +139,16 @@ public class NavigatorActivity extends AppCompatActivity implements ScrollStateA
                         mFab.setImageResource(R.drawable.ic_play_arrow_white_18dp);
                         mFab.show();
                         mIsPlaying.set(false);
+                    }
+                });
+            }
+
+            @Override
+            public void onCompletion(IMediaTrack track) throws RemoteException {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+
                     }
                 });
             }

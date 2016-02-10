@@ -1,6 +1,5 @@
 package com.nick.yinheng.model;
 
-import android.graphics.Bitmap;
 import android.os.Parcel;
 import android.os.Parcelable;
 
@@ -10,25 +9,6 @@ import android.os.Parcelable;
  * Github: https://github.com/NickAndroid
  */
 public class IMediaTrack implements Parcelable {
-
-    private String title;
-    private String artist;
-
-    private long id;
-    private long albumId;
-
-    private String url;
-
-    public IMediaTrack() {
-    }
-
-    protected IMediaTrack(Parcel in) {
-        title = in.readString();
-        artist = in.readString();
-        id = in.readLong();
-        albumId = in.readLong();
-        url = in.readString();
-    }
 
     public static final Creator<IMediaTrack> CREATOR = new Creator<IMediaTrack>() {
         @Override
@@ -41,6 +21,40 @@ public class IMediaTrack implements Parcelable {
             return new IMediaTrack[size];
         }
     };
+    private String title;
+    private String artist;
+    private long id;
+    private long albumId;
+    private long duration;
+    private String url;
+    private String album;
+
+    public IMediaTrack() {
+    }
+
+    protected IMediaTrack(Parcel in) {
+        title = in.readString();
+        artist = in.readString();
+        id = in.readLong();
+        albumId = in.readLong();
+        url = in.readString();
+    }
+
+    public long getDuration() {
+        return duration;
+    }
+
+    public void setDuration(long duration) {
+        this.duration = duration;
+    }
+
+    public String getAlbum() {
+        return album;
+    }
+
+    public void setAlbum(String album) {
+        this.album = album;
+    }
 
     public String getTitle() {
         return title;
@@ -104,6 +118,8 @@ public class IMediaTrack implements Parcelable {
                 ", id=" + id +
                 ", albumId=" + albumId +
                 ", url='" + url + '\'' +
+                ", album='" + album + '\'' +
+                ", duration=" + duration +
                 '}';
     }
 }

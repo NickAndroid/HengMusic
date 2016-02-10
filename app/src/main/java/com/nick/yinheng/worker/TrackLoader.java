@@ -3,11 +3,13 @@ package com.nick.yinheng.worker;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
 import android.os.Handler;
 import android.provider.BaseColumns;
 import android.provider.MediaStore;
 
 import com.nick.yinheng.model.IMediaTrack;
+import com.nick.yinheng.repository.DatabaseHelper;
 import com.nick.yinheng.service.UserCategory;
 
 import java.util.ArrayList;
@@ -38,15 +40,61 @@ public class TrackLoader {
     }
 
     public List<IMediaTrack> load(UserCategory category, Context context) {
-
-        switch (category) {
-            case Favourite:
-            case All:
-            case Recent:
-                return loadAll(context);
-        }
-
+        if (category == UserCategory.ALL) return loadAll(context);
+        if (category == UserCategory.RECENT) return loadRecent(context);
         throw new IllegalArgumentException("Bad category #" + category);
+    }
+
+    private List<IMediaTrack> loadRecent(Context c) {
+        List<IMediaTrack> list = new ArrayList<IMediaTrack>();
+        DatabaseHelper databaseHelper = new DatabaseHelper(c);
+        SQLiteDatabase db = databaseHelper.getWritableDatabase();
+        Cursor cursor = db.query(UserCategory.RECENT.name(), null, null, null, null, null, null);
+
+        if (cursor != null && cursor.getCount() > 0) {
+            for (cursor.moveToFirst(); !cursor.isAfterLast(); cursor
+                    .moveToNext()) {
+                long id = cursor
+                        .getLong(cursor.getColumnIndex(DatabaseHelper.BaseColumns.COLUMN_SONG_ID));
+                String title = cursor.getString(cursor
+                        .getColumnIndexOrThrow(DatabaseHelper.BaseColumns.COLUMN_TITLE));
+
+                String singer = cursor.getString(cursor
+                        .getColumnIndexOrThrow(DatabaseHelper.BaseColumns.COLUMN_ARTIST));
+
+                int time = cursor.getInt(cursor
+                        .getColumnIndexOrThrow(DatabaseHelper.BaseColumns.COLUMN_DURATION));
+
+                String name = cursor.getString(cursor
+                        .getColumnIndexOrThrow(DatabaseHelper.BaseColumns.COLUMN_TITLE));
+                String url = cursor.getString(cursor
+                        .getColumnIndexOrThrow(DatabaseHelper.BaseColumns.COLUMN_URL));
+                String album = cursor.getString(cursor
+                        .getColumnIndexOrThrow(DatabaseHelper.BaseColumns.COLUMN_ALBUM));
+                long albumid = cursor.getLong(cursor
+                        .getColumnIndex(DatabaseHelper.BaseColumns.COLUMN_ALBUM_ID));
+
+                if (url.endsWith(".mp3") || url.endsWith(".MP3")) {
+                    IMediaTrack track = new IMediaTrack();
+                    track.setTitle(title);
+                    track.setArtist(singer);
+                    track.setId(id);
+                    track.setUrl(url);
+                    track.setAlbumId(albumid);
+                    track.setAlbum(album);
+                    track.setDuration(time);
+                    list.add(track);
+                }
+            }
+        }
+        try {
+            if (cursor != null) {
+                cursor.close();
+            }
+        } catch (Exception e) {
+            // Noop.
+        }
+        return list;
     }
 
     private List<IMediaTrack> loadAll(Context c) {
@@ -68,7 +116,6 @@ public class TrackLoader {
 
                 int time = cursor.getInt(cursor
                         .getColumnIndexOrThrow(MediaStore.Audio.AudioColumns.DURATION));
-                time = time / 60000;
 
                 String name = cursor.getString(cursor
                         .getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME));
@@ -90,6 +137,8 @@ public class TrackLoader {
                     track.setId(id);
                     track.setUrl(url);
                     track.setAlbumId(albumid);
+                    track.setAlbum(album);
+                    track.setDuration(time);
                     list.add(track);
                 }
             }
@@ -102,7 +151,6 @@ public class TrackLoader {
             // Noop.
         }
         return list;
-
     }
 
 

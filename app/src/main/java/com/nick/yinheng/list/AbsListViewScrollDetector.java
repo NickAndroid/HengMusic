@@ -10,9 +10,9 @@ public abstract class AbsListViewScrollDetector implements AbsListView.OnScrollL
     private AbsListView mListView;
     private int mScrollThreshold;
 
-    public  abstract void onScrollUp();
+    public abstract void onScrollUp();
 
-    public  abstract void onScrollDown();
+    public abstract void onScrollDown();
 
     @Override
     public void onScrollStateChanged(AbsListView view, int scrollState) {

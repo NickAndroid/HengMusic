@@ -9,23 +9,26 @@ import android.os.RemoteException;
 import android.support.annotation.Nullable;
 
 import com.nick.yinheng.model.IMediaTrack;
+import com.nick.yinheng.repository.TrackManagerRepoImpl;
 import com.nick.yinheng.tool.Logger;
 import com.nick.yinheng.tool.Preconditions;
+import com.nick.yinheng.tool.PreferenceHelper;
+import com.nick.yinheng.worker.SharedExecutor;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 
-public class MediaPlayerService extends Service {
+public class MediaPlayerService extends Service implements MediaPlayer.OnCompletionListener {
 
+    final List<IPlaybackListener> mListeners;
+    List<IMediaTrack> tracks;
     private ServiceStub mStub;
     private LazyPlayer mPlayer;
     private State mState;
-
     private Logger mLogger;
-
-    final List<IPlaybackListener> mListeners;
 
     public MediaPlayerService() {
         mListeners = new ArrayList<>();
@@ -36,6 +39,7 @@ public class MediaPlayerService extends Service {
         super.onCreate();
         mStub = new ServiceStub();
         mPlayer = new LazyPlayer();
+        mPlayer.setOnCompletionListener(this);
         mState = State.Idle;
         mLogger = Logger.from(this);
     }
@@ -85,6 +89,11 @@ public class MediaPlayerService extends Service {
         notifyStop(mPlayer.getCurrent());
     }
 
+    private void assumePendingList(List<IMediaTrack> tracks)
+            throws RemoteException {
+        this.tracks = tracks;
+    }
+
     private void listen(IPlaybackListener listener) {
         Preconditions.checkNotNull(listener);
         synchronized (mListeners) {
@@ -105,6 +114,18 @@ public class MediaPlayerService extends Service {
             }
             mListeners.remove(listener);
         }
+    }
+
+    private int getPlayMode() {
+        return PreferenceHelper.from(this).getPlayMode();
+    }
+
+    private void setPlayMode(int mode) {
+        PreferenceHelper.from(this).setPlayMode(mode);
+    }
+
+    private boolean isPlaying() {
+        return getState() == State.Playing;
     }
 
     private void notifyPlaying(IMediaTrack track) {
@@ -177,6 +198,20 @@ public class MediaPlayerService extends Service {
         }
     }
 
+    private void notifyComplete(IMediaTrack track) {
+
+        synchronized (mListeners) {
+
+            for (IPlaybackListener listener : mListeners) {
+                try {
+                    listener.onCompletion(track);
+                } catch (RemoteException e) {
+
+                }
+            }
+        }
+    }
+
     private void notifyError(int errNo, String message) {
 
         synchronized (mListeners) {
@@ -189,6 +224,42 @@ public class MediaPlayerService extends Service {
                 }
             }
         }
+    }
+
+    private void next() {
+        int next = tracks.indexOf(mPlayer.getCurrent());
+        switch (getPlayMode()) {
+            case PlayMode.MODE_LIST:
+                next = next + 1 == tracks.size() ? 0 : next + 1;
+                break;
+            case PlayMode.MODE_RANDOM:
+                next = new Random(100).nextInt(tracks.size() - 1);
+                break;
+            case PlayMode.MODE_REPEAT_ALL:
+                next = next++ == tracks.size() ? 0 : next + 1;
+                break;
+            case PlayMode.MODE_REPEAT_ONE:
+                break;
+        }
+        play(tracks.get(next));
+    }
+
+    private void previous() {
+        int next = tracks.indexOf(mPlayer.getCurrent());
+        switch (getPlayMode()) {
+            case PlayMode.MODE_LIST:
+                next = next - 1 < 0 ? 0 : next - 1;
+                break;
+            case PlayMode.MODE_RANDOM:
+                next = new Random(100).nextInt(tracks.size() - 1);
+                break;
+            case PlayMode.MODE_REPEAT_ALL:
+                next = next - 1 < 0 ? 0 : next - 1;
+                break;
+            case PlayMode.MODE_REPEAT_ONE:
+                break;
+        }
+        play(tracks.get(next));
     }
 
     private State getState() {
@@ -205,59 +276,27 @@ public class MediaPlayerService extends Service {
         return mStub;
     }
 
-    class ServiceStub extends IMusicPlayerService.Stub {
-
-        @Override
-        public void play(IMediaTrack track) throws RemoteException {
-            MediaPlayerService.this.play(track);
-        }
-
-        @Override
-        public void pause() throws RemoteException {
-            MediaPlayerService.this.pause();
-        }
-
-        @Override
-        public void resume() throws RemoteException {
-            MediaPlayerService.this.resume();
-        }
-
-        @Override
-        public void stop() throws RemoteException {
-            MediaPlayerService.this.stop();
-        }
-
-        @Override
-        public boolean isPlaying() throws RemoteException {
-            return false;
-        }
-
-        @Override
-        public void listen(IPlaybackListener listener) throws RemoteException {
-            MediaPlayerService.this.listen(listener);
-        }
-
-        @Override
-        public void unListen(IPlaybackListener listener) throws RemoteException {
-            MediaPlayerService.this.unListen(listener);
-        }
+    @Override
+    public void onCompletion(MediaPlayer mp) {
+        SharedExecutor.get().execute(new Runnable() {
+            @Override
+            public void run() {
+                TrackManagerRepoImpl.from(getApplicationContext()).addTo(UserCategory.RECENT, mPlayer.getCurrent());
+            }
+        });
+        next();
+        notifyComplete(mPlayer.getCurrent());
     }
 
     private enum State {
         Playing, Paused, Stopped, Idle
     }
 
-    private class LazyPlayer extends MediaPlayer {
-
-        IMediaTrack current;
-
-        public IMediaTrack getCurrent() {
-            return current;
-        }
-
-        public void setCurrent(IMediaTrack current) {
-            this.current = current;
-        }
+    public interface PlayMode {
+        public final int MODE_REPEAT_ALL = 0x1;
+        public final int MODE_REPEAT_ONE = 0x2;
+        public final int MODE_RANDOM = 0x3;
+        public final int MODE_LIST = 0x4;
     }
 
     public static class Proxy extends ServiceProxy implements IMusicPlayerService {
@@ -276,77 +315,6 @@ public class MediaPlayerService extends Service {
             return intent;
         }
 
-        @Override
-        public void onConnected(IBinder binder) {
-            mService = IMusicPlayerService.Stub.asInterface(binder);
-        }
-
-        @Override
-        public void play(final IMediaTrack track) throws RemoteException {
-            setTask(new ProxyTask() {
-                @Override
-                public void run() throws RemoteException {
-                    mService.play(track);
-                }
-            }, "play");
-        }
-
-        @Override
-        public void pause() throws RemoteException {
-            setTask(new ProxyTask() {
-                @Override
-                public void run() throws RemoteException {
-                    mService.pause();
-                }
-            }, "pause");
-        }
-
-        @Override
-        public void resume() throws RemoteException {
-            setTask(new ProxyTask() {
-                @Override
-                public void run() throws RemoteException {
-                    mService.resume();
-                }
-            }, "resume");
-        }
-
-        @Override
-        public void stop() throws RemoteException {
-            setTask(new ProxyTask() {
-                @Override
-                public void run() throws RemoteException {
-                    mService.stop();
-                }
-            }, "stop");
-        }
-
-        @Override
-        public boolean isPlaying() throws RemoteException {
-            return false;
-        }
-
-        @Override
-        public void listen(final IPlaybackListener listener) throws RemoteException {
-            setTask(new ProxyTask() {
-                @Override
-                public void run() throws RemoteException {
-                    mService.listen(listener);
-                }
-            }, "listen");
-        }
-
-        @Override
-        public void unListen(final IPlaybackListener listener) throws RemoteException {
-            setTask(new ProxyTask() {
-                @Override
-                public void run() throws RemoteException {
-                    mService.unListen(listener);
-                }
-            }, "unListen");
-        }
-
-
         public static void play(final IMediaTrack track, Context context) {
             try {
                 new Proxy(context).play(track);
@@ -354,7 +322,6 @@ public class MediaPlayerService extends Service {
 
             }
         }
-
 
         public static void pause(Context context) {
             try {
@@ -396,9 +363,241 @@ public class MediaPlayerService extends Service {
             }
         }
 
+        public static void next(Context context) {
+            try {
+                new Proxy(context).next();
+            } catch (RemoteException e) {
+
+            }
+        }
+
+        public static void previous(Context context) {
+            try {
+                new Proxy(context).previous();
+            } catch (RemoteException e) {
+
+            }
+        }
+
+        public static void setPlayMode(int mode, Context context) {
+            try {
+                new Proxy(context).setPlayMode(mode);
+            } catch (RemoteException e) {
+
+            }
+        }
+
+        public static int getPlayMode(Context context) {
+            try {
+                return new Proxy(context).getPlayMode();
+            } catch (RemoteException e) {
+
+            }
+            return PlayMode.MODE_LIST;
+        }
+
+        public static void assumePendingList(final List<IMediaTrack> tracks, Context context) {
+            try {
+                new Proxy(context).assumePendingList(tracks);
+            } catch (RemoteException e) {
+
+            }
+        }
+
+        @Override
+        public void onConnected(IBinder binder) {
+            mService = IMusicPlayerService.Stub.asInterface(binder);
+        }
+
+        @Override
+        public void play(final IMediaTrack track) throws RemoteException {
+            setTask(new ProxyTask() {
+                @Override
+                public void run() throws RemoteException {
+                    mService.play(track);
+                }
+            }, "play");
+        }
+
+        @Override
+        public void assumePendingList(final List<IMediaTrack> tracks) throws RemoteException {
+            setTask(new ProxyTask() {
+                @Override
+                public void run() throws RemoteException {
+                    mService.assumePendingList(tracks);
+                }
+            }, "assumePendingList");
+        }
+
+        @Override
+        public void pause() throws RemoteException {
+            setTask(new ProxyTask() {
+                @Override
+                public void run() throws RemoteException {
+                    mService.pause();
+                }
+            }, "pause");
+        }
+
+        @Override
+        public void resume() throws RemoteException {
+            setTask(new ProxyTask() {
+                @Override
+                public void run() throws RemoteException {
+                    mService.resume();
+                }
+            }, "resume");
+        }
+
+        @Override
+        public void stop() throws RemoteException {
+            setTask(new ProxyTask() {
+                @Override
+                public void run() throws RemoteException {
+                    mService.stop();
+                }
+            }, "stop");
+        }
+
+        @Override
+        public void next() throws RemoteException {
+            setTask(new ProxyTask() {
+                @Override
+                public void run() throws RemoteException {
+                    mService.next();
+                }
+            }, "next");
+        }
+
+        @Override
+        public void previous() throws RemoteException {
+            setTask(new ProxyTask() {
+                @Override
+                public void run() throws RemoteException {
+                    mService.previous();
+                }
+            }, "previous");
+        }
+
+        @Override
+        public int getPlayMode() throws RemoteException {
+            return 0;
+        }
+
+        @Override
+        public void setPlayMode(final int mode) throws RemoteException {
+            setTask(new ProxyTask() {
+                @Override
+                public void run() throws RemoteException {
+                    mService.setPlayMode(mode);
+                }
+            }, "setPlayMode");
+        }
+
+        @Override
+        public boolean isPlaying() throws RemoteException {
+            return false;
+        }
+
+        @Override
+        public void listen(final IPlaybackListener listener) throws RemoteException {
+            setTask(new ProxyTask() {
+                @Override
+                public void run() throws RemoteException {
+                    mService.listen(listener);
+                }
+            }, "listen");
+        }
+
+        @Override
+        public void unListen(final IPlaybackListener listener) throws RemoteException {
+            setTask(new ProxyTask() {
+                @Override
+                public void run() throws RemoteException {
+                    mService.unListen(listener);
+                }
+            }, "unListen");
+        }
+
         @Override
         public IBinder asBinder() {
             return null;
+        }
+    }
+
+    class ServiceStub extends IMusicPlayerService.Stub {
+
+        @Override
+        public void play(IMediaTrack track) throws RemoteException {
+            MediaPlayerService.this.play(track);
+        }
+
+        @Override
+        public void assumePendingList(List<IMediaTrack> tracks) throws RemoteException {
+            MediaPlayerService.this.assumePendingList(tracks);
+        }
+
+        @Override
+        public void pause() throws RemoteException {
+            MediaPlayerService.this.pause();
+        }
+
+        @Override
+        public void resume() throws RemoteException {
+            MediaPlayerService.this.resume();
+        }
+
+        @Override
+        public void stop() throws RemoteException {
+            MediaPlayerService.this.stop();
+        }
+
+        @Override
+        public void next() throws RemoteException {
+            MediaPlayerService.this.next();
+        }
+
+        @Override
+        public void previous() throws RemoteException {
+            MediaPlayerService.this.previous();
+        }
+
+        @Override
+        public int getPlayMode() throws RemoteException {
+            return MediaPlayerService.this.getPlayMode();
+        }
+
+        @Override
+        public void setPlayMode(int mode) throws RemoteException {
+            MediaPlayerService.this.setPlayMode(mode);
+        }
+
+        @Override
+        public boolean isPlaying() throws RemoteException {
+            return MediaPlayerService.this.isPlaying();
+        }
+
+        @Override
+        public void listen(IPlaybackListener listener) throws RemoteException {
+            MediaPlayerService.this.listen(listener);
+        }
+
+        @Override
+        public void unListen(IPlaybackListener listener) throws RemoteException {
+            MediaPlayerService.this.unListen(listener);
+        }
+    }
+
+    private class LazyPlayer extends MediaPlayer {
+
+        IMediaTrack current;
+
+        public IMediaTrack getCurrent() {
+            return current;
+        }
+
+        public void setCurrent(IMediaTrack current) {
+            this.current = current;
         }
     }
 }

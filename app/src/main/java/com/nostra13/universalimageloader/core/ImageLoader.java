@@ -744,7 +744,7 @@ public class ImageLoader {
 	}
 
 	/**
-	 * Pause ImageLoader. All new "load&display" tasks won't be executed until ImageLoader is {@link #resume() resumed}.
+	 * Pause ImageLoader. ALL new "load&display" tasks won't be executed until ImageLoader is {@link #resume() resumed}.
 	 * <br />
 	 * Already running tasks are not paused.
 	 */

@@ -1,18 +1,16 @@
 package com.nick.yinheng.content;
 
+import android.content.Context;
 import android.os.Bundle;
-import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.BaseAdapter;
 import android.widget.ListView;
 
 import com.nick.yinheng.R;
-import com.nick.yinheng.model.IMediaTrack;
-
-import java.util.List;
+import com.nick.yinheng.list.AbsListViewScrollDetector;
+import com.nick.yinheng.list.ScrollStateAdapter;
 
 /**
  * Created by nick on 16-2-7.
@@ -21,7 +19,25 @@ import java.util.List;
  */
 public abstract class TrackBrowserFragment extends TabFragment {
 
+    protected ScrollStateAdapter mScrollAdapter;
+    protected AbsListViewScrollDetector mDetector = new AbsListViewScrollDetector() {
+        @Override
+        public void onScrollDown() {
+            mScrollAdapter.onScrollDown();
+        }
+
+        @Override
+        public void onScrollUp() {
+            mScrollAdapter.onScrollUp();
+        }
+    };
     private ListView mListView;
+
+    @Override
+    public void onAttach(Context context) {
+        super.onAttach(context);
+        mScrollAdapter = (ScrollStateAdapter) getActivity();
+    }
 
     @Nullable
     @Override

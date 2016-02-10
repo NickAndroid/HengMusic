@@ -152,7 +152,7 @@ class ImageLoaderEngine {
 	}
 
 	/**
-	 * Pauses engine. All new "load&display" tasks won't be executed until ImageLoader is {@link #resume() resumed}.<br
+	 * Pauses engine. ALL new "load&display" tasks won't be executed until ImageLoader is {@link #resume() resumed}.<br
 	 * /> Already running tasks are not paused.
 	 */
 	void pause() {
